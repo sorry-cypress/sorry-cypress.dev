@@ -15,6 +15,9 @@ jobs:
         uses: actions/setup-node@v2.1.0
         with:
           node-version: '12.x'
+      
+      - name: Install dependencies
+        - run: yarn
 
       - name: Cache dependencies
         uses: actions/cache@v2
@@ -23,8 +26,9 @@ jobs:
           key: ${{ runner.os }}-node-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-node-
+      
 
-      - run: npm run build
+      - run: yarn build
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
