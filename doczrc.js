@@ -4,7 +4,7 @@ const libName = pkg.name;
 
 export default {
   src: './src/',
-  dest: './demo',
+  dest: './dist',
   title: libName,
   port: 8888,
   hashRouter: true,
