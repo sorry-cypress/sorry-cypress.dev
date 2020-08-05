@@ -1,0 +1,177 @@
+---
+name: Heroku
+route: /heroku
+menu: Installation
+---
+
+Running sorry-cypress on Heroku is the cheapest option. It is free when using free dynos. Follow the instructions below to setup the service on Heroku platform.
+
+## Running a stateless director service
+
+Click the button below to deploy the basic, in-memory configuration of `director` to Heroku:
+
+<a
+  href="https://heroku.com/deploy?template=https://github.com/agoldis/sorry-cypress/tree/master"
+  target="_blank"
+>
+  <img src="https://www.herokucdn.com/deploy/button.svg" alt="Deploy" />
+</a>
+
+## Running a stateful director service
+
+Download and install the [Heroku CLI](https://devcenter.heroku.com/articles/heroku-cli).
+
+You must have Docker set up locally to continue. You should see output when you run this command.
+
+```bash
+$ docker ps
+```
+
+### Overview
+
+We'll create 3 separate Heroku applications - one for each service. Publicly available docker images of 3 services are available at:
+
+- https://hub.docker.com/repository/docker/agoldis/sorry-cypress-director
+- https://hub.docker.com/repository/docker/agoldis/sorry-cypress-api
+- https://hub.docker.com/repository/docker/agoldis/sorry-cypress-dashboard
+
+The images are automatically updated on each release and tagged in accordance with GitHub releases.
+
+In addition, sorry-cypress uses MongoDB as a persistance layer for storing and retreiving test results. We'll use a free `mLab` hosted solution to run a managed instance of MongoDB.
+
+### Creating `director` service
+
+- Create a new application and give it a good name, note the name, you'll need it later:
+
+<img src="https://s3.amazonaws.com/agoldis.dev/sorry-cypress/heroku/director/001.png" />
+
+- Add `mLab` free-tier MongoDB add-on
+
+<img src="https://s3.amazonaws.com/agoldis.dev/sorry-cypress/heroku/director/002.png" />
+<img src="https://s3.amazonaws.com/agoldis.dev/sorry-cypress/heroku/director/003.png" />
+
+- Set application deployment type to "Container Registry"
+
+<img src="https://s3.amazonaws.com/agoldis.dev/sorry-cypress/heroku/director/004.png" />
+
+Now we'll run shell commands to deploy the `director` service
+
+```bash
+# Sign into Heroku Container Registry.
+$ heroku container:login
+
+# Pull director service image
+$ docker pull agoldis/director:latest
+
+# Tag director service image as Heroku app image
+$ docker tag agoldis/director:latest registry.heroku.com/<name_of_director_app>/web
+
+# Push the image to Heroku Container Registry
+$ docker push registry.heroku.com/<name_of_director_app>/web
+
+# Deploy the image
+$ heroku container:release --app <name_of_director_app> web
+```
+
+### Creating `api` service
+
+Repeat the steps for `director` service, use different Heroku application name. There's no need to add `mLab` add-on for `api`.
+
+Run the next commands to deploy `api` service to Heroku:
+
+```bash
+# Sign into Heroku Container Registry.
+$ heroku container:login
+
+# Pull director service image
+$ docker pull agoldis/api:latest
+
+# Tag director service image as Heroku app image
+$ docker tag agoldis/api:latest registry.heroku.com/<name_of_api_app>/web
+
+# Push the image to Heroku Container Registry
+$ docker push registry.heroku.com/<name_of_api_app>/web
+
+# Deploy the image
+$ heroku container:release --app <name_of_api_app> web
+```
+
+### Creating `dashboard` service
+
+Repeat the steps for `director` service, use different heroku application name. There's no need to add `mLab` add-on for `dashboard`.
+
+Run the next commands to deploy `dashboard` service to Heroku:
+
+```bash
+# Sign into Heroku Container Registry.
+$ heroku container:login
+
+# Pull director service image
+$ docker pull agoldis/dashboard:latest
+
+# Tag director service image as Heroku app image
+$ docker tag agoldis/dashboard:latest registry.heroku.com/<name_of_dashboard_app>/web
+
+# Push the image to Heroku Container Registry
+$ docker push registry.heroku.com/<name_of_dashboard_app>/web
+
+# Deploy the image
+$ heroku container:release --app <name_of_dashboard_app> web
+```
+
+### Configure tha apps to communicate
+
+Set the following configuration variables for created applications:
+
+- For `director`:
+
+```bash
+# Use stateful mode and keep test results in MongoDB
+EXECUTION_DRIVER="../execution/mongo/driver"
+
+# Dashboard app url
+DASHBOARD_URL=<dashboard_app_url>
+
+# MongoDB database name
+MONGODB_DATABASE=<mLab_database_name>
+
+# MongoDB connection string
+MONGODB_URI=<mLab_database_access_credentials>
+
+# If you've set up S3 bucket for keeping screenshots
+# Screenshots driver path
+SCREENSHOTS_DRIVER="../screenshots/s3.driver"
+
+# S3 Bucket name
+S3_BUCKET="bucket_name"
+# AWS credentials with write access to S3 bucket
+AWS_ACCESS_KEY_ID="key_id"
+AWS_SECRET_ACCESS_KEY="secret_access"
+```
+
+- For `api`
+
+```bash
+# MongoDB database name
+MONGODB_DATABASE=<mLab_database_name>
+
+# MongoDB connection string
+MONGODB_URI=<mLab_database_access_credentials>
+```
+
+- For `dashboard`
+
+```bash
+# For communicating with API
+GRAPHQL_SCHEMA_URL=<api_app_url>
+```
+
+### Summary
+
+That's it 🎉!
+
+[Reconfigure cypress agents](/configuration/cypress-agent) and try to run some tests. You will see test results accessing "dashboard" app URL.
+
+### Optional: Set up S3 bucket to keep screenshots
+
+Follow https://github.com/agoldis/sorry-cypress/wiki/S3-screenshot-bucket-setup-instructions
