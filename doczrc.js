@@ -8,7 +8,7 @@ export default {
   title: libName,
   port: 8888,
   hashRouter: true,
-  base: `/${libName}/`,
+  base: `/${libName}`,
   menu: [
     'Getting Started',
     'Demo & Examples',
