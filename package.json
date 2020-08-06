@@ -1,5 +1,6 @@
 {
-  "name": "sorry-cypress.dev",
+  "name": "sorry-cypress",
+  "description": "An open-source, on-premise, self-hosted alternative to Cypress dashboard with free parallelization",
   "version": "2.0.0",
   "license": "MIT",
   "scripts": {
@@ -11,6 +12,7 @@
     "docz": "latest",
     "prop-types": "^15.7.2",
     "react": "^16.11.0",
-    "react-dom": "^16.11.0"
+    "react-dom": "^16.11.0",
+    "react-helmet-async": "^1.0.6"
   }
 }
