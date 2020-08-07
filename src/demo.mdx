@@ -1,5 +1,5 @@
 ---
-name: Demo & Examples
+name: Demo
 route: /demo
 ---
 
@@ -9,7 +9,7 @@ Visit https://sorry-cypress-demo.herokuapp.com/ to see the web dashboard in acti
 
 > This demo is a free heroku instance, it takes a minute to spin it up when you first navigate.
 
-You can [reconfigure Cypress](#Reconfiguring-Cypress) to use `api_url: "https://sorry-cypress-demo-director.herokuapp.com/"`, run your tests and see the results appear at the dashboard.
+You can [reconfigure Cypress](/cypress-agent#cypress-agent-configuration) to use `api_url: "https://sorry-cypress-demo-director.herokuapp.com/"`, run your tests and see the results appear at the dashboard.
 
 Also consider the [example](https://github.com/agoldis/sorry-cypress/tree/master/example) with a detailed parallelization instructions.
 
@@ -20,7 +20,7 @@ Also consider the [example](https://github.com/agoldis/sorry-cypress/tree/master
 
 This will start all 3 services on your local machine.
 
-[Reconfigure Cypress](#Reconfiguring-Cypress) to use `api_url: "http://localhost:1234/"`,
+[Reconfigure Cypress](/cypress-agent#cypress-agent-configuration) to use `api_url: "http://localhost:1234/"`,
 
 Run your tests `cypress run --parallel --record --key xxx --ci-build-id <buildId>` and you will see the results appear in the dashboard. Those cypress tests will run in parallel without connecting to the official dashboard.
 

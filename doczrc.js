@@ -4,12 +4,29 @@ export default {
   port: 8888,
   menu: [
     'Introduction',
-    'Demo & Examples',
+    'Demo',
+    'Quickstart',
     'Terminology',
     {
-      name: 'Installation',
-      menu: ['AWS'],
+      name: 'Director',
+      menu: [
+        'Configuration',
+        {
+          name: 'Execution drivers',
+          menu: ['In-memory', 'Persisting MongoDB'],
+        },
+        {
+          name: 'Storage drivers',
+          menu: ['Dummy', 'AWS S3', 'Minio'],
+        },
+      ],
     },
+    'API',
+    'Dashboard',
+    'Installation',
+    'CI Guides',
+    'Cypress agent',
+    'Development',
   ],
 
   themeConfig: {

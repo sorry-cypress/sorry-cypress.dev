@@ -1,6 +1,6 @@
 ---
 name: AWS
-route: /aws
+route: /installation/aws
 menu: Installation
 ---
 
@@ -31,7 +31,7 @@ Just hit the button 👇🏻
 1. Click the button, follow on-screen instructions
 2. Wait for deployment to complete
 3. Go to "Output" section of CloudFormation task to see access URLs
-4. [Reconfigure cypress](https://github.com/agoldis/sorry-cypress#Reconfiguring-Cypress) to use DirectorURL from the previous step.
+4. [Reconfigure cypress](/cypress-agent#cypress-agent-configuration) to use DirectorURL from the previous step.
 5. That's it! 🎉 Don't forget to star this repo.
 
 ### Love CLI?
@@ -78,7 +78,7 @@ In addition, sorry-cypress uses MongoDB as a persistance layer for storing and r
 
 The key artifacts created by the stack are:
 
-- Director URL - this is what you provide when [configure cypress agent to use the alternative dashboard](https://github.com/agoldis/sorry-cypress/wiki/Configuring-cypress-agents).
+- Director URL - this is what you provide when [configure cypress agent to use the alternative dashboard](/cypress-agent#cypress-agent-configuration).
 - Dashboard URL - web dashboard access URL
 - API URL - GraphQL API access URL
 - S3 storage bucket - for storing tests video recordings and screenshots
@@ -100,7 +100,7 @@ The amount of memry units dedicated to running the services. This resource is al
 
 - `DirectorPort (default: 8080)`
 
-The port number for accessing the director service. You'll need to use it as a destination for [configure cypress agent to use the alternative dashboard](https://github.com/agoldis/sorry-cypress/wiki/Configuring-cypress-agents).
+The port number for accessing the director service. You'll need to use it as a destination for [configure cypress agent to use the alternative dashboard](/cypress-agent#cypress-agent-configuration).
 
 The stack created [AWS Application Load Balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html) to provide access to the underlying services. By default, AWS LB URL points to the web dashboad (on port `80`). The director service is available via the same URL but different port. For example, if the access URL created by the stack is `http://sorry-cypress-1502240720.us-east-1.elb.amazonaws.com`, and `DirectorPort=8080` then `director` service will be available at `http://sorry-cypress-1502240720.us-east-1.elb.amazonaws.com:8080`
 

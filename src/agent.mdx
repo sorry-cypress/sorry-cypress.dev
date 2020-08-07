@@ -1,0 +1,89 @@
+---
+name: Cypress agent
+route: /cypress-agent
+---
+
+## Guide
+
+Parallelizing cypress tests means running different tests on multiple cypress agents at the same time. The [official Cypress documentation](https://docs.cypress.io/guides/guides/parallelization.html) greatly explains why is it good.
+
+It is important to note that this project only replaces the original cypress dashboard. You will still need to set up (and pay for) a CI environment that runs cypress agents.
+
+![Parallization diagram](./images/parallelization-diagram.png)
+
+## Cypress agent configuration
+
+Cypress agent is the tools that runs the tests. When an agent is configured to run test in parallel, it will try to connect a remote dashboard to coordinate the tests running order. When using sorry-cypress you'll need to override the default configuration and use an alternative URL. The next few sections explain how to reconfigure cypress agents for communicating with sorry-cypress.
+
+## Manual
+
+Find cypress installation path
+
+```bash
+$ DEBUG=cypress:* cypress version
+
+...
+# here it is
+cypress:cli Reading binary package.json from: /Users/agoldis/Library/Caches/Cypress/3.4.1/Cypress.app/Contents/Resources/app/package.json +0ms
+...
+```
+
+In my case it is: `/Users/agoldis/Library/Caches/Cypress/3.4.1/Cypress.app/Contents/Resources/app/`
+
+Change the default dashboard URL
+
+```bash
+$ cat /Users/agoldis/Library/Caches/Cypress/3.4.1/Cypress.app/Contents/Resources/app/packages/server/config/app.yml
+
+...
+# Replace this with a URL of the alternative dashboard
+production:
+  # api_url: "https://api.cypress.io/"
+  api_url: "http://localhost:1234/"
+...
+```
+
+## CLI one-liners
+
+Use this CLI one-liner to change cypress configuration (courtesy of [@MeStrak](https://github.com/MeStrak)):
+
+```bash
+> sed -i -e 's|api_url:.*$|api_url: "https://sorry-cypress-demo-director.herokuapp.com/"|g' /*/.cache/Cypress/*/Cypress/resources/app/packages/server/config/app.yml
+```
+
+Or for windows (by [@nickcox](https://github.com/nickcox)):
+
+```powershell
+ls $env:LOCALAPPDATA/Cypress/Cache -Recurse -Filter app.yml |
+% { (Get-Content $_ -Raw) -replace "https://api.cypress.io/", "https://sorry-cypress-demo-director.herokuapp.com/" | Out-File $_ }
+```
+
+## sorry-cypress wrapper
+
+Thanks [@janineahn](https://github.com/janineahn) and [@redaxmedia](https://github.com/redaxmedia) for this contribution!
+
+Instead of changing the `api_url` in the cypress config, it's also possible to reroute the cypress api IP in your `/etc/hosts` file.
+
+Sorry-cypress includes an executable helper for this, to use it run `sudo sorry-cypress` (superuser rights are necessary for editing the hosts file).
+
+This command will use [hostile](https://github.com/feross/hostile) to change your hosts file and will start cypress in a child process.
+Once Cypress is done or killed the rerouting rule in your hosts file will be deleted.
+
+Please be aware of the following limitation before using `sorry-cypress.js` script:
+
+- Only works with `etc/hosts` or `C:/Windows/System32/drivers/etc/hosts` present
+- Only works with HTTPS on and port 443 on the target machine
+- Has hard coded arguments for the cypress run
+- Missing output that CLI started/finished
+
+The command will need the following env variables:
+
+- `SORRY_CYPRESS_RECORD_KEY`
+- `SORRY_CYPRESS_API_IP`
+- `SORRY_CYPRESS_BUILD_ID`
+
+Example:
+
+```sh
+sudo SORRY_CYPRESS_BUILD_ID=build-001 SORRY_CYPRESS_RECORD_KEY=whateve SORRY_CYPRESS_API_IP=127.0.0.1 ./bin/sorry-cypress.js <other cypress arguments>
+```

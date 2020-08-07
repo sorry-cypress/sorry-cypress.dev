@@ -1,0 +1,33 @@
+---
+name: Dashboard
+route: /dashboard
+---
+
+The ReactJS web dashboard uses [API services](/api) to display the test results and currently running tests. You can browse test details and failure messages.
+
+When a [Storage driver](/director/storage) is configured, you can also see screenshots and video recordings (if enabled).
+
+## Configuration
+
+Set the environment variable `GRAPHQL_SCHEMA_URL` with the URL of [API service](/api).
+GraphQL client will use it to pull schema definitions and issue queries.
+
+```sh
+GRAPHQL_SCHEMA_URL='https://sorry-cypress-demo-api.herokuapp.com'
+```
+
+You can explore an example dashboard at https://sorry-cypress-demo.herokuapp.com/.
+
+## Running the service
+
+```sh
+$ cd packages/dashboard
+
+$ npm install
+$ npm run build
+...
+$ npm run start
+
+$ node ./server
+Listening on 8080...
+```

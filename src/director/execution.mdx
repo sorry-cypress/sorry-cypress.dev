@@ -1,0 +1,27 @@
+---
+name: Execution drivers
+route: /director/execution
+menu: Director
+---
+
+## In-memory
+
+Keeps the state of runs in-memory. That means that restarting the service wipes everything.
+
+That's the simplest and most naive implementation.
+
+If you just want to run the tests in parallel and not worry about storing test results.
+
+## Persisting MongoDB
+
+The state - test runs and results - are persisted in MongoDB. The [API service](/api) queries MongoDB the retreive test run details when using [Dashboard](/dashboard).
+
+To enable this driver, set the envrionment variables:
+
+```
+EXECUTION_DRIVER="../execution/mongo/driver"
+MONGODB_URI="monodgb://your-DB-URI"
+MONGODB_DATABASE="your-DB-name"
+```
+
+With MongoDB driver you can use the other services - `api` and `dashboard` to browse the results of your test runs.

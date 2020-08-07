@@ -1,0 +1,58 @@
+---
+name: Development
+route: /development
+---
+
+## Setup
+
+The project uses [yarn workspaces](https://yarnpkg.com/lang/en/docs/workspaces/). Install dependecies by running `yarn` in the root directory.
+
+## Services Development
+
+Use different terminals to run each package in `watch` mode.
+
+```
+yarn dev
+```
+
+## Using docker-compose
+
+The project uses `docker-compose` to conveniently run backend services in dockerized containers, during development as well.
+
+It is recommended to use `docker-compose` to run the backend services (`director` and `api`) in watch mode.
+
+The `dashboard` is less convenient to develop in a docker, it is more effective to run it on host machine.
+
+- Run `docker-compose build` from the project's root directory
+- Run `docker-compose up` to start the services
+
+The latter command will create 3 services:
+
+- MongoDB instance on port `27017`
+- `director` service on port `1234`
+- `api` service on `4000`
+
+You can change the configuration using the environment variables defined in `docker-compose.yml` file.
+
+## Behind the scenes
+
+API and Dashboard are straightforward GraphQL and ReactJS implementations. Director implements the next flow:
+
+1. Each cypress agent (machine) sends the same initial request with:
+
+- specs lists
+- machine hardware details
+- git commit details
+- `--ci-build-id` and other CLI parameters
+
+2. The `director` fetches (or creates a new ) `run` based on the parameters and responds with a randomly generated `machineId` and the `runId`.
+
+3. Each cypress client requests a next available task for the `runId` which was returned previously
+
+4. The service looks at the list of tests and returns next available test, marks the returned test as `claimed`
+
+5. Cypress agent runs the test and reports the results to `director`
+
+6. Director persists the results and return upload URLs for storing screenshots and videos.
+
+7. When there're no more available tests, director returns an "empty" response - cypress agent halts execution

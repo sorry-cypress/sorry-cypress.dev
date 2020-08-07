@@ -1,0 +1,27 @@
+---
+name: API
+route: /api
+---
+
+API service is a simple GraphQL wrapper, that allows querying data [persisted by MongoDB execution driver](/director/execution#persisting-mongodb).
+
+## Configuration
+
+Set environment variables that define MongoDB connection details:
+
+```sh
+MONGODB_URI='mongodb://mongo:27017'
+MONGODB_DATABASE='sorry-cypress'
+```
+
+## Starting the service
+
+```sh
+cd packages/api
+
+npm install
+npm run build
+npm run start
+
+🚀 Apollo server ready at http://localhost:4000/
+```

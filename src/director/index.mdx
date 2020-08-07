@@ -1,0 +1,68 @@
+---
+name: Configuration
+route: /director/configuration
+menu: Director
+---
+
+## Overview
+
+The `director` service is responsible for:
+
+- paralellization and coordination of test runs
+- saving tests results
+- saving failed tests screenshots
+
+When you launch Cypress on a CI environment with multiple machines, each machine first contacts the dashboard to get the next test to run.
+
+The dashboard coordinates the requests from different machines and assigns tests to each.
+
+## Starting the service
+
+```sh
+cd packages/director
+
+npm install
+npm run build
+npm run start
+
+# ...
+
+Initializing "in-memory" execution driver...
+Initializing "dummy" screenshots driver...
+Listening on 1234...
+```
+
+By default, the service will run on port `1234` with `in-memory` execution driver and `dummy` storage driver.
+
+## Drivers
+
+The `director` uses "drivers" that define different aspects of its functionality. You can choose or implement different type of drivers to support the desired functionality. There're several community-supported drivers listed below.
+
+## Configuration
+
+The service uses [`dotenv`](https://www.npmjs.com/package/dotenv) package. To change the default configuration, create `.env` file in service's root to set the default environment variables:
+
+```sh
+$ pwd
+/Users/agoldis/sorry-cypress/packages/director
+
+$ cat .env
+
+PORT=1234
+
+# DASHBOARD_URL is what Cypress client shows as a "Run URL"
+DASHBOARD_URL="https://sorry-cypress.herokuapp.com"
+
+# Path the the execution driver
+EXECUTION_DRIVER="../execution/in-memory"
+
+# Path the the storage driver
+SCREENSHOTS_DRIVER="../screenshots/dummy.driver"
+
+# Read more about record keys whitelist below
+ALLOWED_KEYS="my_secret_key,my_another_secret_key"
+```
+
+Setting `ALLOWED_KEYS` variable allows you to define list of comma delimited record keys (provided to the Cypress Runner using `--key` option) which are accepted by the `director` service. This can be useful when Cypress is running on external CI servers and we need to expose `director` to the internet.
+
+Empty or not provided variable means that all record keys are allowed.

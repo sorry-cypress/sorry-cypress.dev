@@ -1,0 +1,89 @@
+---
+name: AWS CodeBuild II
+route: /ci/aws-codebuild-kyle
+menu: CI Guides
+---
+
+This tutorial is contributed by [@KyleThenTR](https://github.com/KyleThenTR). The original text is available at https://github.com/agoldis/sorry-cypress/issues/6.
+
+---
+
+This first buildspec if what we use in our pipeline to verify an environment once we've already deployed. The second buildspec is one we use in our merge requests as a runner before we can merge into master (just to verify we aren't breaking anything)
+
+The codebuilds are running on the cypress/browsers docker images https://hub.docker.com/r/cypress/browsers
+
+`buildspec-test.yml`
+
+```yml
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - npm ci
+      - npm install concurrently -g
+      - sed -i -E "s@(api_url:) (.*)@\1 \"${SORRY_CYPRESS_DIRECTOR_URL}\"@g" ~/.cache/Cypress/3.8.3/Cypress/resources/app/packages/server/config/app.yml
+  build:
+    commands:
+      - Xvfb :99 &
+      - export DISPLAY=:99
+      - CYPRESS_CI_RUN_COMMAND="npm run cy:run -- --record --key ci-tests --parallel --ci-build-id CI-${CODEBUILD_START_TIME}-${CODEBUILD_BUILD_ID}"
+      - |
+        concurrently \
+        "$CYPRESS_CI_RUN_COMMAND" \
+        "$CYPRESS_CI_RUN_COMMAND" \
+        "$CYPRESS_CI_RUN_COMMAND" \
+        "$CYPRESS_CI_RUN_COMMAND" \
+        "$CYPRESS_CI_RUN_COMMAND"
+      - pkill Xvfb
+  post_build:
+    commands:
+      - npm run cy:merge-results
+      - npm run cy:generate-report
+
+artifacts:
+  files:
+    - '**/*'
+  base-directory: './cypress/results'
+```
+
+`buildspec-ci-test.yml`
+
+```yml
+version: 0.2
+
+env:
+  git-credential-helper: yes
+
+phases:
+  pre_build:
+    commands:
+      - git fetch origin
+      - git merge origin/master --no-commit --no-ff
+      - npm ci
+      - npm install concurrently wait-on -g
+      - sed -i -E "s@(api_url:) (.*)@\1 \"${SORRY_CYPRESS_DIRECTOR_URL}\"@g" ~/.cache/Cypress/3.8.3/Cypress/resources/app/packages/server/config/app.yml
+  build:
+    commands:
+      - npm run start-prod &
+      - Xvfb :99 &
+      - export DISPLAY=:99
+      - CYPRESS_CI_RUN_COMMAND="npm run cy:run -- --record --key ci-tests --parallel --ci-build-id Runner-${CODEBUILD_START_TIME}-${CODEBUILD_BUILD_ID}"
+      - |
+        wait-on http://localhost:3000 && concurrently \
+        "$CYPRESS_CI_RUN_COMMAND" \
+        "$CYPRESS_CI_RUN_COMMAND" \
+        "$CYPRESS_CI_RUN_COMMAND" \
+        "$CYPRESS_CI_RUN_COMMAND" \
+        "$CYPRESS_CI_RUN_COMMAND"
+      - pkill Xvfb
+  post_build:
+    commands:
+      - npm run cy:merge-results
+      - npm run cy:generate-report
+
+artifacts:
+  files:
+    - '**/*'
+  base-directory: './cypress/results'
+```

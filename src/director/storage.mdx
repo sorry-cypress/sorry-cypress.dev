@@ -1,0 +1,96 @@
+---
+name: Storage drivers
+route: /director/storage
+menu: Director
+---
+
+## Dummy
+
+Is the default driver and it does nothing - snapshots won't be saved.
+
+Set the environment variable to define the screenshots driver.
+
+```
+SCREENSHOTS_DRIVER="../screenshots/dummy.driver"
+```
+
+## AWS S3
+
+The driver generates upload URLs for S3 bucket. When set up properly the following will happen when each test suite finishes:
+
+- cypress agent reports to `director` what videos and / or failed tests screenshots are availabe.
+- `director` uses AWS credentials to generate
+  - a temporary signed URL for each screenshot / video
+  - a read URL is saved to associated test results
+- cypress agent uses the temporary URL to upload the assets
+- dashboard uses the read URL to display video / screenshots
+
+### Setup
+
+Please make sure that [AWS credentials](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html) with proper access to invoke [`s3.getSignedUrl`](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#getSignedUrl-property) are available in the environment.
+
+### Configuration
+
+You can customize certain aspects of how `director` handles upload and read URLs generation by setting up environment variables.
+
+#### `SCREENSHOTS_DRIVER`
+
+Defines what screenshot driver to use. In order to use S3 driver set value:
+
+```sh
+SCREENSHOTS_DRIVER="../screenshots/s3.driver"
+```
+
+#### `S3_BUCKET`
+
+Set the bucket name to store the asset. There's no default value, you have to set it before using the driver.
+
+```sh
+S3_BUCKET="your_bucket_name"
+```
+
+#### `S3_REGION`
+
+AWS region, default value is `"us-east-1"`
+
+```sh
+S3_REGION="us-east-1"
+```
+
+#### `S3_ACL`
+
+ACL settings that for new S3 items. The default value is `"public-read"`. Read more about [S3 ACL](https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html).
+
+```sh
+S3_ACL="public-read"
+```
+
+#### `S3_READ_URL_PREFIX`
+
+The URL prefix to use when reading the screenshots / video. The default value is `https://${S3_BUCKET}.s3.amazonaws.com/${key}`.
+
+Setting `S3_READ_URL_PREFIX` to `http://example.com` will change the generated URL to `https://example.com/${key}`.
+
+```sh
+S3_READ_URL_PREFIX=<null>
+```
+
+## Minio Driver
+
+Thanks @StefanS-O for contributing minio driver!
+
+See [`docker-compose.minio.yml`](https://github.com/agoldis/sorry-cypress/blob/master/docker-compose.minio.yml) for ready-to-use sorry-cypress configuration that uses locally hosted Minio as a storage layer.
+
+To run on the local machine, edit your `/etc/hosts` file to allow cypress agents discover the local instance of minio
+
+```sh
+127.0.0.1 storage
+```
+
+**Warning!** The example `docker-compose.minio.yml` deletes existing buckets, so please test - or remove from the docker file after first run!
+
+You should be able to change the environment variables according to your Minio setup. Please refer to the default values at [`src/screenshots/minio/config.ts`](https://github.com/agoldis/sorry-cypress/blob/master/packages/director/src/screenshots/minio/config.ts).
+
+The available minio configuration resembles S3 storage driver configruation.
+
+Treat your Minio keys and secrets AWS credentials and hide them.

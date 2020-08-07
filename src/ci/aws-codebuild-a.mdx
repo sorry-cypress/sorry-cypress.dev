@@ -1,0 +1,573 @@
+---
+name: AWS CodeBuild I
+route: /ci/aws-codebuild-mlsad
+menu: CI Guides
+---
+
+This tutorial is contributed by [@mlsad3](https://github.com/mlsad3). The original text is available at https://github.com/agoldis/sorry-cypress/issues/6.
+
+---
+
+**This post is not about deploying sorry-cypress on AWS, but focusing on getting my Cypress to run in parallel and point to sorry-cypress's `director`.**
+
+After my CodeBuild and CodeDeploy (site is deployed to Elastic Beanstalk), I added another 'Stage' and put all of my Cypress tests. I launch 5 in parallel.
+
+![Codebuild screenshot](https://user-images.githubusercontent.com/15711477/73124587-48404700-3f5a-11ea-9ed3-fd6f72e87ab8.png)
+
+Here is what each of the Cypress CodeBuilds look like:
+
+![Codebuild screenshot](https://user-images.githubusercontent.com/15711477/73125329-e506e280-3f62-11ea-811a-1bf0f57a773d.png)
+
+Then I created a buildspec for my Cypress run. Note the following things I am doing in there:
+
+- In the `install` section, I install all the stuff I need for Cypress, and then npm install my Cypress stuff (mine is located in subdirectory `testing/cypress`)
+
+- In the `pre_build` section, I am modifying a file in my code to make sure I am pointing to the correct development deployment url.
+
+- In the `build` section, I am editing the Cypress install to point to my Cypress Director URL, and then running my Cypress tests script. This script uses a couple environment variables. It uses the `$BUILD_TAG` for `ciBuildId` and `$CODEBUILD_BUILD_NUMBER` for 'uniqueId' (essentially to make sure each parallel test run has a unique identifier, the `$CODEBUILD_BUILD_NUMBER` will be, for example, 73, 74, 75, 76, 77 for my 5 Cypress CodeBuilds).
+
+```
+      version: 0.2
+
+      phases:
+        install:
+          runtime-versions:
+            nodejs: 10
+          commands:
+            - echo Entered the install phase...
+            - apt-get update -y
+            - apt-get install -y apt-transport-https
+            - apt-get install -y libgtk2.0-0 libnotify-dev libgconf-2-4 libnss3 libxss1 libasound2 xvfb
+
+            # Install
+            - echo PATH -- $PATH
+            - echo Installing source npm dependencies to $PWD
+            - cd $CODEBUILD_SRC_DIR/testing/cypress; npm install
+        pre_build:
+          commands:
+            - cd $CODEBUILD_SRC_DIR/testing/cypress
+            - |
+              if expr "${TEST_SERVER_URL}" : ".*\w.*"; then
+                sed -i "s#static BASE_URL = .*#static BASE_URL = '${TEST_SERVER_URL}';#" ./cypress/support/common/constants.js ;
+                cat ./cypress/support/common/constants.js ;
+              fi
+        build:
+          commands:
+            - echo Testing started on `date`
+            - cd $CODEBUILD_SRC_DIR/testing/cypress
+            - echo Which cypress `which cypress`
+            - export DEBUG='cypress:*'
+            - npx cypress version
+            - unset DEBUG
+            - echo Editing Cypress file at /root/.cache/Cypress/3.8.1/Cypress/resources/app/packages/server/config/app.yml
+            - |
+              if expr "${CYPRESS_DIRECTOR_URL}" : ".*\w.*"; then
+                sed -i "s#api_url:.*\"#api_url: \"${CYPRESS_DIRECTOR_URL}\"#" /root/.cache/Cypress/*/Cypress/resources/app/packages/server/config/app.yml ;
+                cat /root/.cache/Cypress/*/Cypress/resources/app/packages/server/config/app.yml ;
+              fi
+            - export BUILD_TAG=${CODEBUILD_SOURCE_VERSION}
+            - cd $CODEBUILD_SRC_DIR/testing/cypress; npm run-script parallel-test
+        post_build:
+          commands:
+            - echo Cypress testing completed on `date`
+
+```
+
+Here is what my cypress package.json has in it:
+
+```
+"parallel-test": "cross-env-shell node scripts/cypress.js --record --parallel --useAws --browser electron  --group electron --key d4dccb30-b3e4-4867-a2d2-892d9600106c --ciBuildId $BUILD_TAG --headless --uniqueId $CODEBUILD_BUILD_NUMBER",
+```
+
+And then in the cypress.js script, I have the following parameters passed into cypress:
+
+```
+      cypress.run({
+          browser: argv.browser,
+          spec: argv.spec,
+          record: argv.record,
+          group: argv.group,
+          headed: !argv.headless,
+          headless: argv.headless,
+          ciBuildId: argv.ciBuildId,
+          key: argv.key,
+          parallel: argv.parallel
+      }).catch((error) => {
+          console.error('Cypress errors: ', error);
+          process.exit(1);
+      }).then((results) => {
+```
+
+### Collecting reports
+
+Here are a few other files my Cypress runs use. Since I don't really use Dashboard (just using Director), I still want to see a report of the results. With all of the jobs running on separate instances, my report merge command only has access to the local subset of tests. Also, I do not know if I am the 'last' machine running. It would be annoying to get 5-6 different emails about the same test results instead of one final email sent by the final process.
+
+One way to do this would be to have a new AWS Pipeline Stage setup that starts once all the tests are finished, and it grabs the data and sends it back. Instead, I added a little synchronization inside the cypress.js that uploads the unique machine id (`$CODEBUILD_BUILD_NUMBER` is assigned to uniqueId) to AWS S3, and when the job finishes, I delete the unique machine id.
+
+If the cypress.js sees that all other unique machine ids are deleted, then there is a VERY good chance that we are the last Cypress process running. In that case, go ahead and download everyone else's test results, and run the merge command. Then email the results.
+
+I used to attach the merged single-file-html to the email, but now have it getting uploaded to a protected S3 bucket, and emailing a link to that...my link only works if you are authenticated on my website. So that url code wouldn't really work for others, but I'm leaving it in just to give an idea.
+
+`scripts/cypress.js`
+
+```
+      require('dotenv').config();
+      const cypress = require('cypress');
+      const yargs = require('yargs');
+      const { merge } = require('mochawesome-merge');
+      const marge = require('mochawesome-report-generator');
+      const rm = require('rimraf');
+      const reporterConfig = require('../reporter');
+      const ls = require('ls');
+      const fs = require('fs');
+      const path = require('path');
+      const email = require('../cypress/support/helpers/contact');
+      const s3 = require('../cypress/support/helpers/awss3');
+
+      const argv = yargs.options({
+          'browser': {
+              alias: 'b',
+              type: 'string',
+              describe: 'Specify different browser to run tests in, either by name or by filesystem path',
+              default: 'chrome',
+              choices: ['chrome', 'electron']
+          },
+          'spec': {
+              alias: 's',
+              type: 'string',
+              describe: 'Specify the specs to run',
+              default: 'cypress/integration/**/*.feature'
+          },
+          'record': {
+              describe: 'Whether to record the test run',
+              type: 'boolean',
+              default: false
+          },
+          'key': {
+              describe: 'Specify your secret record key',
+              type: 'string',
+              default: undefined
+          },
+          'headless': {
+              describe: 'Hide the browser instead of running headed',
+              type: 'boolean',
+              default: false
+          },
+          'parallel': {
+              describe: 'Run recorded specs in parallel across multiple machines',
+              type: 'boolean',
+              default: false
+          },
+          'group': {
+              describe: 'Group recorded tests together under a single run name',
+              type: 'string',
+              default: undefined
+          },
+          'ciBuildId': {
+              describe: 'Specify a unique identifier for a run to enable grouping or parallelization',
+              type: 'string',
+              default: undefined
+          },
+          'uniqueId': {
+              describe: 'A unique identifier for this machine, used to synchronize reports on AWS',
+              type: 'string',
+              default: process.pid
+          },
+          'useAws': {
+              describe: 'Use AWS',
+              type: 'boolean',
+              default: false
+          }
+      }).help()
+        .argv
+
+      // Allow use of environment variables as well
+      argv.record = 'CYPRESS_RECORD' in process.env ? process.env.CYPRESS_RECORD : argv.record;
+      argv.key = 'CYPRESS_RECORD_KEY' in process.env ? process.env.CYPRESS_RECORD_KEY : argv.key;
+      argv.parallel = 'CYPRESS_PARALLEL' in process.env ? process.env.CYPRESS_PARALLEL : argv.parallel;
+      argv.group = 'CYPRESS_GROUP' in process.env ? process.env.CYPRESS_GROUP : argv.group;
+      argv.headless = 'CYPRESS_HEADLESS' in process.env ? process.env.CYPRESS_HEADLESS : argv.headless;
+      argv.ciBuildId = 'CYPRESS_CIBUILDID' in process.env ? process.env.CYPRESS_CIBUILDID : argv.ciBuildId;
+
+      // Ensure Parallel is setup correctly
+      if (argv.parallel) {
+          if (!argv.ciBuildId) {
+              // Set the ciBuildId based on current date
+              argv.ciBuildId = new Date().toISOString().slice(0,10);
+          }
+          if (!argv.group) {
+              argv.group = 'default';
+          }
+          console.log('API', 'Launching with ciBuildId: ' + argv.ciBuildId);
+      };
+
+      const reportDir = reporterConfig.mochawesomeReporterOptions.reportDir;
+      const reportFiles = path.join(reportDir, '*mochawesome*.json');
+      const reportGeneratorOptions = {
+          reportDir: reportDir,
+          files: [reportFiles],
+          saveHtml: true,
+          saveJson: true,
+          reportFilename: 'combinedReport',
+          inline: true
+      };
+      // list all of existing report files
+      ls(reportFiles, { recurse: true }, file => console.log(`removing ${file.full}`));
+
+      // delete all existing report files
+      rm(reportFiles, (error) => {
+          if (error) {
+              console.error(`Error while removing existing report files: ${error}`)
+              process.exit(1)
+          }
+          console.log('Removing all existing report files successfully!')
+      });
+
+      if (argv.useAws) {
+          initS3ForStartOfTesting(process.env.S3_BUCKET_NAME, argv.ciBuildId, argv.uniqueId);
+      }
+
+      cypress.run({
+          browser: argv.browser,
+          spec: argv.spec,
+          record: argv.record,
+          group: argv.group,
+          headed: !argv.headless,
+          headless: argv.headless,
+          ciBuildId: argv.ciBuildId,
+          key: argv.key,
+          parallel: argv.parallel
+      }).catch((error) => {
+          console.error('Cypress errors: ', error);
+          process.exit(1);
+      }).then((results) => {
+          // If this is a parallel build, upload all of the reports to S3
+          generateReport(reportGeneratorOptions, argv.useAws).then((reportResults) => {
+              const testsFailedToRun = !reportResults.report || !reportResults.report.stats;
+              const testFailures = testsFailedToRun ? 0 : reportResults.report.stats.failures;
+              if (testsFailedToRun) {
+                  console.log('Errors generating report');
+                  const dataToEmail = JSON.stringify(reportResults.report, null, 4);
+                  const htmlText = "<html><body>Cypress tests Failed to Run on process " + (argv.uniqueId ? argv.uniqueId : '') + ".<br>" +
+                      "<pre><code>" + dataToEmail + "</code></pre></body></html>";
+                  email.sendEmail({
+                      subject: "Cypress Tests Failed to Run",
+                      html: htmlText
+                  });
+                  throw "Failed to generate report";
+              } else if (reportResults.HandleFinalReports) {
+                  const dataToEmail = JSON.stringify(reportResults.report.stats, null, 4);
+                  if (testFailures) {
+                      console.error("Total Failures: " + reportResults.report.stats.failures);
+                      const htmlText = "<html><body>Cypress tests FAILED: " + reportResults.report.stats.failures + ".<br><br>" +
+                          (argv.useAws
+                            ? "<a href=\"https://my.website.com/s3_protected_access/latestReport.html\">See latest report for details</a><br><br>"
+                            : "See attachment for details<br><br>") +
+                          "<pre><code>" + dataToEmail + "</code></pre></body></html>";
+                      email.sendEmail({
+                          subject: "Cypress Tests Failed",
+                          html: htmlText,
+                          attachmentFiles: argv.useAws ? [] : [reportHtmlLocation],
+                          callback: () => {process.exit(1)} // Ensure exit(1) so CodeBuild 'fails'
+                      });
+                  } else {
+                      const htmlText = "<html><body>Cypress tests PASSED.<br><br>" +
+                          (argv.useAws
+                              ? "<a href=\"https://my.website.com/s3_protected_access/latestReport.html\">See latest report for details</a><br><br>"
+                              : "") +
+                        "<pre><code>" + dataToEmail + "</code></pre></body></html>";
+                      email.sendEmail({
+                          subject: "Cypress Tests Passed",
+                          html: htmlText,
+                      });
+                  }
+              } else if (testFailures) {
+                  process.exit(1);
+              }
+          }).catch((error) => {
+              console.error('generateReport error', error);
+              process.exit(1);
+          });
+      });
+
+      async function initS3ForStartOfTesting(bucket, buildId, uniqueId) {
+          const prefix = 'TestResults/Cypress/' + buildId;
+          await s3.addProcessCounter(bucket, prefix, uniqueId);
+      };
+
+      async function finalizeS3AtEndOfTesting(bucket, buildId, uniqueId, reportDir) {
+          const prefix = 'TestResults/Cypress/' + buildId;
+          const jsonPrefix = prefix + '/json_';
+          const myProcessKeyPrefix = jsonPrefix + uniqueId + '_';
+          // Upload my report files
+          const localReportFiles = fs.readdirSync(reportDir);
+          for (const reportFile of localReportFiles) {
+              if (!reportFile.startsWith('mochawesome') || !reportFile.endsWith('.json')) {
+                  continue;
+              }
+              const fullLocalFileName = path.join(reportDir, reportFile);
+              const s3FileName = myProcessKeyPrefix + reportFile;
+              await s3.uploadFile(fullLocalFileName, bucket, s3FileName);
+          }
+          const processNumber = await s3.removeProcessCounter(bucket, prefix, uniqueId);
+          if (processNumber > 0) {
+              return processNumber;
+          }
+          // We are likely the last process running, so download all other process reports,
+          // so they can be merged into one report
+          const filesOnS3 = await s3.listFiles(bucket, jsonPrefix);
+          if (filesOnS3.$response.error) {
+              console.error('Error getting files from S3', filesOnS3.$response.error);
+              return processNumber;
+          }
+          for (const s3ReportFile of filesOnS3.Contents) {
+              if (s3ReportFile.Key.startsWith(myProcessKeyPrefix)) {
+                  continue;
+              }
+              const fullLocalFileName = path.join(reportDir, s3ReportFile.Key.split('/').pop());
+              await s3.downloadFile(fullLocalFileName, bucket, s3ReportFile.Key);
+          }
+          return processNumber;
+      };
+
+      async function generateReport(options, useAws) {
+          let totalProcessesLeft = 0;
+          if (useAws) {
+              totalProcessesLeft = await finalizeS3AtEndOfTesting(process.env.S3_BUCKET_NAME, argv.ciBuildId, argv.uniqueId, reportDir);
+          }
+          const handleFinalReports = totalProcessesLeft == 0;
+          return merge(options).catch((error) => {
+              console.error('Errors Merging', error);
+          }).then(async (report) => {
+              const reportFiles = await marge.create(report, options);
+              const reportHtmlLocation = path.join(reportGeneratorOptions.reportDir, reportGeneratorOptions.reportFilename + '.html');
+              if (useAws && handleFinalReports) {
+                  const s3Key = "TestResults/Cypress/latestReport.html";
+                  await s3.uploadFile(reportHtmlLocation, process.env.S3_BUCKET_NAME, s3Key);
+              }
+              return { report: report, Files: reportFiles, mergedReport: reportHtmlLocation, HandleFinalReports: handleFinalReports};
+          });
+      }
+```
+
+`helpers/awss3.js`
+
+```
+      const AWS = require("aws-sdk");
+      const fs = require("fs");
+
+      AWS.config.update({
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        region: process.env.AWS_REGION,
+      });
+
+      const s3 = new AWS.S3({apiVersion: '2006-03-01'});
+
+      const uploadFile = async (filePath, bucket, key) => {
+        const params = {
+          Bucket: bucket,
+          Key: key,
+          ContentType: 'binary',
+          ContentEncoding: 'utf8',
+          CacheControl: 'max-age=172800'
+        };
+
+        const fileData = fs.readFileSync(filePath);
+        console.log("Preparing to upload '" + filePath + "' to AWS S3 bucket: " + bucket);
+        params.Body = fileData;
+        return s3.putObject(params, (err, result) => {
+          if (err) {
+            console.err("Error uploading to S3", err);
+          } else {
+            console.log(" - Finished uploading '" + key + "'");
+          }
+          return result;
+        }).promise();
+      };
+
+      const createFile = async (bucket, key, data) => {
+        return s3.putObject({
+          Bucket: bucket,
+          Key: key,
+          Body: data
+        }, (err, result) => {
+          if (err) {
+            console.err("Error uploading to S3", err);
+          } else {
+            console.log(" - Finished Creating File '" + key + "'");
+          }
+          return result;
+        }).promise();
+      };
+
+      const getObject = async (bucket, objectKey) => {
+        try {
+          const params = {
+            Bucket: bucket,
+            Key: objectKey
+          };
+
+          const data = await s3.getObject(params).promise();
+
+          if (data.Body) {
+            return data;
+          } else if (data.$response.error) {
+            throw new Error(`Could not retrieve file from AWS S3: ${data.$response.error}`);
+          }
+        } catch (e) {
+          throw new Error(`Could not retrieve file from S3: ${e.message}`);
+        }
+      };
+
+      const downloadFile = async (filePath, bucket, key) => {
+        return getObject(bucket, key).then((data) => {
+          if (data && data.Body) {
+            fs.writeFileSync(filePath, data.Body);
+          }
+        }).catch((err) => {
+          console.log('Error writing file to (' + filePath + ')', err);
+        });
+      };
+
+      const getSignedUrl = (bucket, objectKey) => {
+        const params = {
+          Bucket: bucket,
+          Key: objectKey
+        };
+        const data = s3.getSignedUrl('getObject', params);
+        return data;
+      };
+
+      const listFiles = async (bucket, prefix) => {
+        try {
+          const data = await s3.listObjectsV2({
+            Bucket: bucket,
+            Prefix: prefix, // Limits response to keys that begin with specified prefix
+          }).promise();
+
+          if (data.$response.error) {
+            throw new Error(`Could not list files in S3: ${data.$response.error}`);
+          }
+          return data;
+        } catch (e) {
+          throw new Error(`Could not list files in S3: ${e.message}`);
+        }
+      };
+
+      // addProcessCounter - Adds a 'lock' file in S3 for use in counting how many active
+      // processes are working on the tests
+      const addProcessCounter = async (bucket, prefix, uniqueId) => {
+        const lockPrefix = prefix + (prefix.endsWith('/') ? '' : '/') + 'lock.';
+        const lockKey = lockPrefix + uniqueId;
+        return await createFile(bucket, lockKey);
+      }
+
+      // removeProcessCounter - Removes our 'lock' file in S3, and returns the number of
+      // remaining lock files in S3.
+      const removeProcessCounter = async (bucket, prefix, uniqueId) => {
+        const lockPrefix = prefix + (prefix.endsWith('/') ? '' : '/') + 'lock.';
+        const lockKey = lockPrefix + uniqueId;
+        try {
+          let data = await s3.deleteObject({
+            Bucket: bucket,
+            Key: lockKey
+          }).promise();
+
+          if (data.$response.error) {
+            throw new Error(`Could not list files in S3: ${data.$response.error}`);
+          }
+
+          data = await listFiles(bucket, lockPrefix);
+          return data && data.Contents ? data.Contents.length : 0;
+        } catch (e) {
+          throw new Error(`Could not list files in S3: ${e.message}`);
+        }
+      }
+
+      module.exports = {uploadFile, downloadFile, getObject, getSignedUrl, listFiles, createFile, addProcessCounter, removeProcessCounter};
+```
+
+`helpers/contact.js`
+
+```
+      const AWS = require('aws-sdk');
+      const nodemailer = require('nodemailer');
+
+      AWS.config.update({
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        region: process.env.AWS_REGION,
+      });
+
+
+      const transporter = nodemailer.createTransport({
+        SES: new AWS.SES({apiVersion: '2010-12-01'})
+      });
+
+      // sendEmail config:
+      //   subject: "Cypress Tests Failed",
+      //   text: "hello world!",
+      //   html: "<b>hello world!</b>",
+      //   attachmentFiles: [pathToAttachment],
+      //   to: undefined, // Defaults to process.env.TO_EMAIL
+      //   from: undefined, // Defaults to process.env.FROM_EMAIL
+      //   callback: () => {process.exit(1)}
+      const sendEmail = (config) => {
+        if (!config) {
+          console.error("Must pass in config to sendEmail");
+          return;
+        }
+        if (!process.env.EMAIL_ON_AWS) {
+          if (config.callback) {
+            config.callback();
+          }
+          return;
+        }
+
+        const toAddress = config.to ? config.to : process.env.TO_EMAIL;
+        const toAddresses = Array.isArray(toAddress) ? toAddress : toAddress.split(";");
+        const fromAddress = config.from ? config.from : process.env.FROM_EMAIL;
+
+        const message = {
+          bcc: toAddresses,
+          subject: config.subject,
+          text: config.text,
+          html: config.html,
+          from: fromAddress,
+          sender: fromAddress
+        };
+
+        if (config.attachmentFiles && config.attachmentFiles.length > 0) {
+          message.attachments = config.attachmentFiles.reduce( (attachments, filePath) => {
+            attachments.push({
+              filename: filePath.replace(/^.*(\\|\/|\:)/,''),
+              path: filePath,
+              cid: filePath.replace(/\s+/, '_') + '@my_unique_id.com'
+            });
+            return attachments;
+          }, []);
+        }
+
+        transporter.sendMail(message, (error, info) => {
+          if (error) {
+              console.log('Error occurred');
+              console.log(error.message);
+              return process.exit(1);
+          }
+
+          console.log('Message sent successfully!');
+          console.log(nodemailer.getTestMessageUrl(info));
+
+          // only needed when using pooled connections
+          transporter.close();
+
+          if (config.callback) {
+            config.callback();
+          }
+        });
+      }
+
+      module.exports = {sendEmail};
+
+```
