@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "docz": "latest",
+    "gatsby-cli": "^2.12.82",
     "prop-types": "^15.7.2",
     "react": "^16.11.0",
     "react-dom": "^16.11.0",
