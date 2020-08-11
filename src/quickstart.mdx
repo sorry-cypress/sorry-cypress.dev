@@ -3,10 +3,51 @@ name: Quickstart
 route: /quickstart
 ---
 
-> Running via docker-compose
+<img src="public/demo.gif" alt="sorry cypress demo" />
 
-> Reconfiguring cypress
+You will need a recent version of docker-compose for this guide.
 
-> Using cloud service on heroku
+## Run the services
 
-> Next steps
+1. Check out the source code.
+2. Run `docker-compose -f docker-compose.minio.yml up`
+3. Open the browser at [http://localhost:8080/](http://localhost:8080/) to see the dashboard
+
+## Reconfigure Cypress agent
+
+[Reconfigure Cypress](/cypress-agent#cypress-agent-configuration) to use `api_url: "http://localhost:1234/"`,
+
+Get cypress agent installation path:
+
+```sh
+$ DEBUG=cypress:* cypress version
+...
+# get the path /Users/agoldis/Library/Caches/Cypress/3.4.1/Cypress.app/Contents/Resources/app/package.json
+cypress:cli Reading binary package.json from: /Users/agoldis/Library/Caches/Cypress/3.4.1/Cypress.app/Contents/Resources/app/package.json
+...
+```
+
+Edit the file `.../Cypress.app/Contents/Resources/app/packages/server/config/app.yml`
+
+```yml
+production:
+  api_url: 'http://localhost:1234'
+  #api_url: "https://api.cypress.io/"
+```
+
+## Run cypress tests in parallel
+
+1. Open few terminals
+2. Run your tests `cypress run --parallel --record --key xxx --ci-build-id <buildId>`
+
+The results will appear in the dashboard. Those cypress tests will run in parallel without connecting to the official dashboard.
+
+## Cloud demo
+
+Visit https://sorry-cypress-demo.herokuapp.com/ to see the web dashboard in action.
+
+> This demo is a free heroku instance, it takes a minute to spin it up when you first navigate.
+
+You can [reconfigure Cypress](/cypress-agent#cypress-agent-configuration) to use `api_url: "https://sorry-cypress-demo-director.herokuapp.com/"`, run your tests and see the results appear at the dashboard.
+
+Also consider the [example](https://github.com/agoldis/sorry-cypress/tree/master/example) with a detailed parallelization instructions.

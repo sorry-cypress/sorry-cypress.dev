@@ -4,7 +4,6 @@ export default {
   port: 8888,
   menu: [
     'Introduction',
-    'Demo',
     'Quickstart',
     'Terminology',
     {
