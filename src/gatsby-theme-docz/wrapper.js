@@ -22,7 +22,6 @@ const Wrapper = ({ children }) => {
               gtag('config', '${GTAG}');
           `}
         </script>
-        <link rel="stylesheet" href="//codemirror.net/theme/dracula.css" />
       </Helmet>
       {children}
     </React.Fragment>

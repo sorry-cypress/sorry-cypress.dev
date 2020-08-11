@@ -2,6 +2,7 @@ export default {
   src: './src/',
   dest: './dist',
   port: 8888,
+  repository: 'https://github.com/agoldis/sorry-cypress',
   menu: [
     'Introduction',
     'Quickstart',
