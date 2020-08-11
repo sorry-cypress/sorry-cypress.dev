@@ -29,18 +29,11 @@ export default {
   ],
 
   themeConfig: {
-    mode: 'light',
-    codemirrorTheme: 'dracula',
-    styles: {
-      body: {
-        fontFamily: "'Source Sans Pro', Helvetica, sans-serif",
-        fontSize: 16,
-        lineHeight: 1.6,
-      },
-      container: {
-        width: '100%',
-        padding: ['20px 40px'],
+    colors: {
+      header: {
+        bg: 'white',
       },
     },
+    mode: 'light',
   },
 };
