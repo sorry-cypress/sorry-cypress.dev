@@ -12,11 +12,17 @@ This tutorial is contributed by [@mlsad3](https://github.com/mlsad3). The origin
 
 After my CodeBuild and CodeDeploy (site is deployed to Elastic Beanstalk), I added another 'Stage' and put all of my Cypress tests. I launch 5 in parallel.
 
-![Codebuild screenshot](https://user-images.githubusercontent.com/15711477/73124587-48404700-3f5a-11ea-9ed3-fd6f72e87ab8.png)
+<img
+  src="https://user-images.githubusercontent.com/15711477/73124587-48404700-3f5a-11ea-9ed3-fd6f72e87ab8.png"
+  alt="Codebuild screenshot"
+/>
 
 Here is what each of the Cypress CodeBuilds look like:
 
-![Codebuild screenshot](https://user-images.githubusercontent.com/15711477/73125329-e506e280-3f62-11ea-811a-1bf0f57a773d.png)
+<img
+  src="https://user-images.githubusercontent.com/15711477/73125329-e506e280-3f62-11ea-811a-1bf0f57a773d.png"
+  alt="Codebuild screenshot"
+/>
 
 Then I created a buildspec for my Cypress run. Note the following things I am doing in there:
 
