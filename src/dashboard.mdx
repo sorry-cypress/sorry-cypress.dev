@@ -16,6 +16,16 @@ GraphQL client will use it to pull schema definitions and issue queries.
 GRAPHQL_SCHEMA_URL='https://sorry-cypress-demo-api.herokuapp.com'
 ```
 
+Set optional environment variable `CI_URL` to add link to CI tool.
+
+```sh
+CI_URL=Link name,https://your.ci.service/project/{project_id}/build/{build_id}
+```
+Where:
+- `Link name` is a custom name that would show in detail, for example, `Travis CI`, `Drone CI`, `Circle CI`.
+- `{project_id}` is a templating tag for cypress project name - would be injected dynamically.
+- `{build_id}` is a templating tag for ID passed to cypress via `--ci-build-id` parameter - would be injected dynamically.
+
 You can explore an example dashboard at https://sorry-cypress-demo.herokuapp.com/.
 
 ## Running the service
