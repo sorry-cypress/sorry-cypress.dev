@@ -3,11 +3,15 @@ name: Dashboard
 route: /dashboard
 ---
 
-The ReactJS web dashboard uses [API services](/api) to display the test results and currently running tests. You can browse test details and failure messages.
+The ReactJS web dashboard uses the [API service](/api) to display the test results and currently running tests. You can browse test details and failure messages.
 
 When a [Storage driver](/director/storage) is configured, you can also see screenshots and video recordings (if enabled).
 
+You can explore an example dashboard at https://sorry-cypress-demo.herokuapp.com/.
+
 ## Configuration
+
+### GRAPHQL_SCHEMA_URL
 
 Set the environment variable `GRAPHQL_SCHEMA_URL` with the URL of [API service](/api).
 GraphQL client will use it to pull schema definitions and issue queries.
@@ -16,17 +20,21 @@ GraphQL client will use it to pull schema definitions and issue queries.
 GRAPHQL_SCHEMA_URL='https://sorry-cypress-demo-api.herokuapp.com'
 ```
 
-Set optional environment variable `CI_URL` to add link to CI tool.
+### CI_URL
+
+Set optional environment variable `CI_URL` to add a link to your CI tool.
 
 ```sh
 CI_URL=Link name,https://your.ci.service/project/{project_id}/build/{build_id}
 ```
-Where:
-- `Link name` is a custom name that would show in detail, for example, `Travis CI`, `Drone CI`, `Circle CI`.
-- `{project_id}` is a templating tag for cypress project name - would be injected dynamically.
-- `{build_id}` is a templating tag for ID passed to cypress via `--ci-build-id` parameter - would be injected dynamically.
 
-You can explore an example dashboard at https://sorry-cypress-demo.herokuapp.com/.
+Where:
+
+- `Link name` is the link name, for example: `Travis CI`, `Drone CI`, `Circle CI`.
+- `{project_id}` is a templating tag for cypress project name - will be injected dynamically.
+- `{build_id}` is a templating tag for ID passed to cypress via `--ci-build-id` parameter - will be injected dynamically.
+
+<img src="/public/CI_URL.png" alt="CI_URL" width="400" />
 
 ## Running the service
 
