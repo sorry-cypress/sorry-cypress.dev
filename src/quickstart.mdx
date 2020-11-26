@@ -35,6 +35,14 @@ production:
   #api_url: "https://api.cypress.io/"
 ```
 
+## Configure the storage driver
+
+Edit your /etc/hosts file to allow cypress agents discover the local instance of [Minio Driver](/director/storage#minio-driver)
+
+```sh
+127.0.0.1 storage
+```
+
 ## Run cypress tests in parallel
 
 1. Open few terminals
