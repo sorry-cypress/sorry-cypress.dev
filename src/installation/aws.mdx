@@ -111,6 +111,76 @@ The port number for accessing the director service. You'll need to use it as a d
 
 The stack created [AWS Application Load Balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html) to provide access to the underlying services. By default, AWS LB URL points to the web dashboad (on port `80`). The director service is available via the same URL but different port. For example, if the access URL created by the stack is `http://sorry-cypress-1502240720.us-east-1.elb.amazonaws.com`, and `DirectorPort=8080` then `director` service will be available at `http://sorry-cypress-1502240720.us-east-1.elb.amazonaws.com:8080`
 
+## Manually setup S3 bucket for screenshots and videos
+
+The following configuration is already part of CloudFormation template, attaching for reference
+
+1. Create a new S3 bucket, enable public access (uncheck `Block all public access`)
+
+2. Set bucket's CORS configuration:
+
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<CORSConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+<CORSRule>
+    <AllowedOrigin>*</AllowedOrigin>
+    <AllowedMethod>POST</AllowedMethod>
+    <AllowedMethod>GET</AllowedMethod>
+    <AllowedMethod>PUT</AllowedMethod>
+    <AllowedMethod>DELETE</AllowedMethod>
+    <AllowedMethod>HEAD</AllowedMethod>
+    <AllowedHeader>*</AllowedHeader>
+</CORSRule>
+</CORSConfiguration>
+```
+
+or for new AWS dashboard:
+
+```json
+[
+  {
+    "AllowedHeaders": ["*"],
+    "AllowedMethods": ["POST", "GET", "PUT", "DELETE", "HEAD"],
+    "AllowedOrigins": ["*"],
+    "ExposeHeaders": []
+  }
+]
+```
+
+3. Open IAM dashboad
+4. Create new user, enable programmatic access. Keep the access key and the secret.
+5. Create and attach the policy to the user:
+
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor0",
+            "Effect": "Allow",
+            "Action": [
+                "s3:PutObject",
+                "s3:PutObjectAcl"
+            ],
+            "Resource": "arn:aws:s3:::<your-bucket-name>/*"
+        }
+    ]
+}
+```
+
+Done!
+
+Now set the environment variables:
+
+```
+AWS_ACCESS_KEY_ID:  <access key from step 4>
+AWS_SECRET_ACCESS_KEY: <secret from step 4>
+S3_BUCKET: <bucketname>
+S3_REGION: <region_name>
+```
+
+sorry-cypress will start uploading the screenshots to the bucket you've just created using [https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html](s3.getSignedUrl).
+
 ## Questions, Suggestions
 
 **⭐️ Alternative configurations / contributions are welcome! ⭐️**
