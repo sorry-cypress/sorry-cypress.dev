@@ -37,18 +37,13 @@ We'll create 3 separate Heroku applications - one for each service. Publicly ava
 
 The images are automatically updated on each release and tagged in accordance with GitHub releases.
 
-In addition, sorry-cypress uses MongoDB as a persistance layer for storing and retreiving test results. We'll use a free `mLab` hosted solution to run a managed instance of MongoDB.
+In addition, sorry-cypress uses MongoDB as a persistance layer for storing and retreiving test results. We'll use a free `Atlas` hosted solution to run a managed instance of MongoDB.
 
 ### Creating `director` service
 
 - Create a new application and give it a good name, note the name, you'll need it later:
 
 <img src="https://s3.amazonaws.com/agoldis.dev/sorry-cypress/heroku/director/001.png" />
-
-- Add `mLab` free-tier MongoDB add-on
-
-<img src="https://s3.amazonaws.com/agoldis.dev/sorry-cypress/heroku/director/002.png" />
-<img src="https://s3.amazonaws.com/agoldis.dev/sorry-cypress/heroku/director/003.png" />
 
 - Set application deployment type to "Container Registry"
 
@@ -61,10 +56,10 @@ Now we'll run shell commands to deploy the `director` service
 $ heroku container:login
 
 # Pull director service image
-$ docker pull agoldis/director:latest
+$ docker pull agoldis/sorry-cypress-director:latest
 
 # Tag director service image as Heroku app image
-$ docker tag agoldis/director:latest registry.heroku.com/<name_of_director_app>/web
+$ docker tag agoldis/sorry-cypress-director:latest registry.heroku.com/<name_of_director_app>/web
 
 # Push the image to Heroku Container Registry
 $ docker push registry.heroku.com/<name_of_director_app>/web
@@ -75,7 +70,7 @@ $ heroku container:release --app <name_of_director_app> web
 
 ### Creating `api` service
 
-Repeat the steps for `director` service, use different Heroku application name. There's no need to add `mLab` add-on for `api`.
+Repeat the steps for `director` service, use different Heroku application name.
 
 Run the next commands to deploy `api` service to Heroku:
 
@@ -84,10 +79,10 @@ Run the next commands to deploy `api` service to Heroku:
 $ heroku container:login
 
 # Pull director service image
-$ docker pull agoldis/api:latest
+$ docker pull agoldis/sorry-cypress-api:latest
 
 # Tag director service image as Heroku app image
-$ docker tag agoldis/api:latest registry.heroku.com/<name_of_api_app>/web
+$ docker tag agoldis/sorry-cypress-api:latest registry.heroku.com/<name_of_api_app>/web
 
 # Push the image to Heroku Container Registry
 $ docker push registry.heroku.com/<name_of_api_app>/web
@@ -98,7 +93,7 @@ $ heroku container:release --app <name_of_api_app> web
 
 ### Creating `dashboard` service
 
-Repeat the steps for `director` service, use different heroku application name. There's no need to add `mLab` add-on for `dashboard`.
+Repeat the steps for `director` service, use different heroku application name.
 
 Run the next commands to deploy `dashboard` service to Heroku:
 
@@ -107,10 +102,10 @@ Run the next commands to deploy `dashboard` service to Heroku:
 $ heroku container:login
 
 # Pull director service image
-$ docker pull agoldis/dashboard:latest
+$ docker pull agoldis/sorry-cypress-dashboard:latest
 
 # Tag director service image as Heroku app image
-$ docker tag agoldis/dashboard:latest registry.heroku.com/<name_of_dashboard_app>/web
+$ docker tag agoldis/sorry-cypress-dashboard:latest registry.heroku.com/<name_of_dashboard_app>/web
 
 # Push the image to Heroku Container Registry
 $ docker push registry.heroku.com/<name_of_dashboard_app>/web
@@ -119,7 +114,11 @@ $ docker push registry.heroku.com/<name_of_dashboard_app>/web
 $ heroku container:release --app <name_of_dashboard_app> web
 ```
 
-### Configure tha apps to communicate
+### Creating a MongoDB database
+
+MongoDB has an awesome service that allows us to create a free cluster that can eventually scale. Because the creation of this cluster is very straightforward and well-written in the docs, we'll not cover that here. But all you'll need is the database name and the access credentials so you can fill the Heroku config variables as we'll see right after. So go ahead to the [MongoDB docs](https://docs.atlas.mongodb.com/getting-started/), get your database running and grab that data!
+
+### Configure the apps to communicate
 
 Set the following configuration variables for created applications:
 
@@ -133,10 +132,10 @@ EXECUTION_DRIVER="../execution/mongo/driver"
 DASHBOARD_URL=<dashboard_app_url>
 
 # MongoDB database name
-MONGODB_DATABASE=<mLab_database_name>
+MONGODB_DATABASE=<atlas_database_name>
 
 # MongoDB connection string
-MONGODB_URI=<mLab_database_access_credentials>
+MONGODB_URI=<atlas_database_access_credentials>
 
 # If you've set up S3 bucket for keeping screenshots
 # Screenshots driver path
@@ -144,6 +143,9 @@ SCREENSHOTS_DRIVER="../screenshots/s3.driver"
 
 # S3 Bucket name
 S3_BUCKET="bucket_name"
+# AWS region, default value is "us-east-1"
+S3_REGION="us-east-1"
+
 # AWS credentials with write access to S3 bucket
 AWS_ACCESS_KEY_ID="key_id"
 AWS_SECRET_ACCESS_KEY="secret_access"
@@ -153,10 +155,10 @@ AWS_SECRET_ACCESS_KEY="secret_access"
 
 ```bash
 # MongoDB database name
-MONGODB_DATABASE=<mLab_database_name>
+MONGODB_DATABASE=<atlas_database_name>
 
 # MongoDB connection string
-MONGODB_URI=<mLab_database_access_credentials>
+MONGODB_URI=<atlas_database_access_credentials>
 ```
 
 - For `dashboard`
