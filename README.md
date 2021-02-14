@@ -1,5 +1,7 @@
 # sorry-cypress.dev
 
+❌ The repo has been archived. Please use https://github.com/sorry-cypress/gitbook instead 
+
 ## Setup
 
 ```sh
